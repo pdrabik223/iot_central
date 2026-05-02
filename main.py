@@ -1,4 +1,6 @@
+import json
 import time
+from pi_pico_w_server_tools.wifi_tools import get_wifi_info
 import utime
 from pi_pico_neopixel_tools.color import Color
 from pi_pico_w_server_tools.app import App, compose_response, format_dict, load_html
@@ -25,6 +27,24 @@ def home_page(cl: socket.socket, parameters: dict):
     )
 
 
+def get_wifi_page(cl: socket.socket, parameters: dict):
+
+    cl.sendall(
+        compose_response(response=format_dict(load_html("static/wifi_config.html"), {}))
+    )
+
+
+def get_wifi_list(cl: socket.socket, parameters: dict):
+
+    wifi_list = get_wifi_info()
+    response = {}
+
+    for wifi in wifi_list:
+        response[wifi.ssid] = wifi.password
+
+    cl.sendall(compose_response(response=json.dumps(response)))
+
+
 def animation():
     global uptime_minutes
     brightness = 1
@@ -35,8 +55,8 @@ def animation():
                 for _ in range(10):
                     time.sleep(0.1)
 
-                    led_strip.set_pixel(0, Color.white(), 100 * brightness)
-                    
+                    led_strip.set_pixel(0, Color.pink(), 100 * brightness)
+
                     if up:
                         brightness += 0.02
                     else:
@@ -69,7 +89,9 @@ if __name__ == "__main__":
     _thread.start_new_thread(animation, ())
 
     app.register_endpoint("/v1", home_page)
-
+    app.register_endpoint("/v1/get_wifi_list", get_wifi_list)
+    app.register_endpoint("/v1/get_wifi_page", get_wifi_page)
+    
     try:
         app.main_loop()
     except (KeyboardInterrupt, Exception) as ex:
