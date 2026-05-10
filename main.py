@@ -6,7 +6,8 @@ from pi_pico_w_server_tools.app import App, compose_response, format_dict, load_
 import socket
 from pi_pico_neopixel_tools.led_strip import LedStrip
 
-# import ephem
+import utime
+
 import ntptime
 from machine import RTC
 import _thread
@@ -17,7 +18,7 @@ rtc = RTC()
 
 
 def animation():
-    global uptime_minutes
+    # global uptime_minutes
     brightness = 1
     up = True
     while 1 < 2:
@@ -29,16 +30,14 @@ def animation():
                     led_strip.set_pixel(0, Color.pink(), 100 * brightness)
 
                     if up:
-                        brightness -= 0.02
-                    else:
                         brightness += 0.02
+                    else:
+                        brightness -= 0.02
 
                     if brightness >= 1:
                         up = False
                     elif brightness <= 0.05:
                         up = True
-
-            uptime_minutes += 1
 
         synch_time(rtc)
 
@@ -52,17 +51,16 @@ def synch_time(rtc, timezone_offset=1):
     rtc.datetime((tm[0], tm[1], tm[2], tm[6] + 1, tm[3], tm[4], tm[5], 0))
 
 
-def home_page(cl: socket.socket, parameters: dict):
-    cl.sendall(compose_response(response=load_html("static/index.html")))
-
+# def home_page(cl: socket.socket, parameters: dict):
+#     cl.sendall(compose_response(response=load_html("static/index.html")))
 
 if __name__ == "__main__":
 
     synch_time(rtc)
+
     _thread.start_new_thread(animation, ())
-    
-    app.set_server_start(rtc)
-    app.register_endpoint("/v1", home_page)
+
+    # app.register_endpoint("/v1", home_page)
 
     try:
         app.main_loop()
