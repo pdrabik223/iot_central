@@ -9,12 +9,65 @@
     <meta charset="UTF-8">
 
     <title>IoT local</title>
+    <script>
+        async function get_endpoint_config() {
+            const table = document.getElementById('endpoint_config');
+            try {
+                const resp = await fetch(`/v1/get_endpoint_config`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+
+                if (!resp.ok) {
+                    console.log(`Response status: ${resp.status}`)
+                    document.getElementById('wifi_list').innerHTML = '<p>Error loading WiFi list</p>'
+                } else {
+                    const row = table.rows[0];
+                    for (const config of await resp.json()) {
+                        const newRow = document.createElement("tr");
+
+                        newRow.innerHTML = `
+                            <tr> 
+                                <td><a href="${config["ip"]}/v1/"> ${config["host_name"]}</a></td>
+                                <td>${config["last_connection_time"]}</td>
+                                <td>${config["redirects_to"]}</td>
+                            </tr>
+                        `;
+
+                        row.parentNode.insertBefore(newRow, row.nextSibling);
+                    }
+                }
+
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+
+        window.addEventListener('load', get_endpoint_config);
+
+    </script>
 </head>
 
 <body style="padding: 5% 5%; max-width: 1400px; min-width: 400px;  margin: auto;">
     <H1>Welcome to IoT Local</H1>
+    <a href="/v1/wifi_config" class="button-class">Manage Wifi Config</a>
 
-    <button onclick="() =>{location.href = '/v1/wifi_config'}">Manage Wifi Config</button>
+    <table id="endpoint_config">
+        <thead>
+            <tr>
+                <th>Host Name</th>
+                <th>Last Connection</th>
+                <th>Redirects</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+
+
 
 </body>
 
