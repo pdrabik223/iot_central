@@ -1,3 +1,4 @@
+import gc
 import json
 import time
 
@@ -65,10 +66,21 @@ def connect(cl: socket.socket, parameters: dict):
             if config.ip != parameters.get("ip", "Unknown"):
                 requires_save = True
 
-            config.ip = parameters.get("ip", "Unknown")
+            config.ip = parameters.get("ip", "Unknown")  
             config.last_connection_time = utime.localtime()
             is_new_connection = False
-            break
+            
+            for target in config.redirects_to:
+                parameters_copy = parameters.copy()
+                
+                url = f"{target}"
+                
+                try:
+                    res = requests.get(url=url,timeout=3)
+                    res.close()
+                    gc.collect()
+                except Exception as err:
+                    print(err)
 
     if is_new_connection:
         endpoint_config.append(
@@ -82,6 +94,7 @@ def connect(cl: socket.socket, parameters: dict):
     if is_new_connection or requires_save:
         # save config to file
         pass
+    
     cl.sendall(compose_response())
 
 
@@ -116,7 +129,7 @@ class Endpoint:
             "redirects_to": self.redirects_to,
         }
 
-
+import urequests as requests
 endpoint_config: list[Endpoint] = [
     Endpoint("SENSOR_ROOM", utime.localtime(), app.ip, []),
     Endpoint("MOON_CALENDAR", utime.localtime(), app.ip, []),
