@@ -10,6 +10,32 @@
 
     <title>IoT local</title>
     <script>
+        function update_btn(id, html, isLoading) {
+            document.getElementById(id).setAttribute('aria-busy', `${isLoading}`);
+            document.getElementById(id).innerHTML = html
+        }
+
+        async function delete_config(host_name) {
+            update_btn(`delete_${host_name}_button`, "", true)
+
+            try {
+                const resp = await fetch(`/v1/delete_host?host_name=${host_name}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+                if (!resp.ok) {
+                    console.log(`Response status: ${response.status}`)
+                    update_btn(`delete_${host_name}_button`, "!", false)
+                } else {
+                    get_endpoint_config()
+                }   
+            } catch (error) {
+                console.error(error.message);
+                update_btn(`delete_${host_name}_button`, "!", false)
+            }
+        }
 
         async function onCheckboxChange(host_name, state, target) {
             request_url = ""
@@ -85,6 +111,7 @@
                         const newRow = document.createElement("tr");
 
                         let options = host_names.slice()
+                        const btn = `<button class="secondary action-button" 'aria-busy'="false" id="delete_${config["host_name"]}_button" onclick="delete_config('${config["host_name"]}')">✕</button>`;
 
                         options.splice(index++, 1)
 
@@ -93,6 +120,7 @@
                                 <td><a href="${config["ip"]}/v1/"> ${config["host_name"]}</a></td>
                                 <td>${config["last_connection_time"]}</td>
                                 <td>${getDropDown(config["host_name"], config["redirects_to"], options)}</td>
+                                <td>${btn}</td>
                             </tr>
                         `;
 
@@ -120,6 +148,7 @@
                 <th>Host Name</th>
                 <th>Last Connection</th>
                 <th>Redirects</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -127,7 +156,7 @@
         </tbody>
     </table>
 
-
+    <p></p>
 
 </body>
 
