@@ -10,6 +10,53 @@
 
     <title>IoT local</title>
     <script>
+
+        async function onCheckboxChange(host_name, state, target) {
+            request_url = ""
+            if (state) {
+                // target is already in `redirects_to`
+                // so we remove it 
+                request_url = `/v1/remove_redirect?host_name=${host_name}&target=${target}`
+            } else {
+                // add target to `redirects_to` 
+                request_url = `/v1/add_redirect?host_name=${host_name}&target=${target}`
+            }
+            try {
+                const resp = await fetch(request_url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                })
+
+                if (!resp.ok) {
+                    console.log(`Response status: ${resp.status}`)
+                    alert(`Fetch error: ${resp.status}, retry later`);
+                }
+
+            } catch (error) {
+                console.error(`Fetch error: ${error.message}, retry later`);
+                alert(`Fetch error: ${error.message}, retry later`);
+            }
+
+            get_endpoint_config()
+
+        }
+
+        function getDropDown(host_name, redirects_to, options) {
+
+            to_return = ""
+            for (const option of options) {
+                to_return += `<label><input 
+                                type="checkbox" 
+                                onchange="onCheckboxChange('${host_name}', ${redirects_to.includes(option) ? true : false}, '${option}')"
+                                ${redirects_to.includes(option) ? "checked" : ""} 
+                                value="${option}">${option}</label>`
+            }
+
+            return to_return
+        }
+
         async function get_endpoint_config() {
             const table = document.getElementById('endpoint_config');
             try {
@@ -22,17 +69,30 @@
 
                 if (!resp.ok) {
                     console.log(`Response status: ${resp.status}`)
-                    document.getElementById('wifi_list').innerHTML = '<p>Error loading WiFi list</p>'
+                    document.getElementById('endpoint_config').innerHTML = '<p>Error loading WiFi list</p>'
                 } else {
                     const row = table.rows[0];
-                    for (const config of await resp.json()) {
+                    while (table.rows.length > 1) {
+                        table.deleteRow(1);
+                    }
+                    const resp_json = await resp.json()
+                    let host_names = []
+
+                    for (const config of resp_json) host_names.push(config["host_name"])
+
+                    let index = 0
+                    for (const config of resp_json) {
                         const newRow = document.createElement("tr");
+
+                        let options = host_names.slice()
+
+                        options.splice(index++, 1)
 
                         newRow.innerHTML = `
                             <tr> 
                                 <td><a href="${config["ip"]}/v1/"> ${config["host_name"]}</a></td>
                                 <td>${config["last_connection_time"]}</td>
-                                <td>${config["redirects_to"]}</td>
+                                <td>${getDropDown(config["host_name"], config["redirects_to"], options)}</td>
                             </tr>
                         `;
 

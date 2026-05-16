@@ -54,6 +54,45 @@ def synch_time(rtc, timezone_offset=1):
 def home_page(cl: socket.socket, parameters: dict):
     cl.sendall(compose_response(response=load_html("static/index.html")))
 
+def add_redirect(cl: socket.socket, parameters: dict):
+    
+    host_name = parameters.get("host_name", None)
+    target = parameters.get("target", None)
+    
+    if host_name is None:
+        return  cl.sendall(compose_response(status_code=400))
+    
+    if target is None:
+        return  cl.sendall(compose_response(status_code=400))
+    
+    for id, config in enumerate(endpoint_config):
+        
+        if config.host_name == host_name:
+            endpoint_config[id].redirects_to.append(target)
+    
+    cl.sendall(compose_response())
+
+def remove_redirect(cl: socket.socket, parameters: dict):
+    
+    host_name = parameters.get("host_name", None)
+    target = parameters.get("target", None)
+    
+    if host_name is None:
+        return  cl.sendall(compose_response(status_code=400))
+    
+    if target is None:
+        return  cl.sendall(compose_response(status_code=400))
+    
+    for id, config in enumerate(endpoint_config):
+        
+        if config.host_name == host_name:
+            endpoint_config[id].redirects_to.remove(target)
+    
+    cl.sendall(compose_response())
+
+
+
+
 
 def connect(cl: socket.socket, parameters: dict):
 
@@ -73,7 +112,11 @@ def connect(cl: socket.socket, parameters: dict):
             for target in config.redirects_to:
                 parameters_copy = parameters.copy()
                 
-                url = f"{target}"
+                url = f"{target}?"
+                for val in parameters_copy:
+                    url += f"{val}={parameters_copy[val]}"
+                
+                print(url)
                 
                 try:
                     res = requests.get(url=url,timeout=3)
@@ -133,7 +176,7 @@ import urequests as requests
 endpoint_config: list[Endpoint] = [
     Endpoint("SENSOR_ROOM", utime.localtime(), app.ip, []),
     Endpoint("MOON_CALENDAR", utime.localtime(), app.ip, []),
-    Endpoint("SENSOR_ROOM", utime.localtime(), app.ip, []),
+    Endpoint("SENSOR_ROOM_2", utime.localtime(), app.ip, []),
 ]
 
 
@@ -146,7 +189,9 @@ if __name__ == "__main__":
     app.register_endpoint("/v1/", home_page)
     app.register_endpoint("/v1/get_endpoint_config", get_endpoint_config)
     app.register_endpoint("/v1/connect", connect)
-
+    app.register_endpoint("/v1/add_redirect", add_redirect)
+    app.register_endpoint("/v1/remove_redirect", remove_redirect)
+    
     try:
         app.main_loop()
     except (KeyboardInterrupt, Exception) as ex:
