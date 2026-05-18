@@ -125,75 +125,82 @@ def delete_host(cl: socket.socket, parameters: dict):
     cl.sendall(compose_response())
 
 
-def validate_required(
-    cl: socket.socket, parameters: dict, param: str, type: type = any
-) -> any:
-    val = parameters.get(param, None)
+def get_redirect_url(host_name: str) -> str | None:
+    for config in endpoint_config:
+        if config.host_name == host_name:
+            if config.redirect_endpoint != None:
+                endpoint = config.redirect_endpoint
 
-    if val is None:
-        return cl.sendall(
-            compose_response(
-                status_code=400, response=f"Missing param '{param}', of type: '{type}'"
-            )
-        )
+                while endpoint[0] == "/":
+                    endpoint = endpoint[1:]
 
-    if type(val) is not type:
-        return cl.sendall(
-            compose_response(
-                status_code=400,
-                response=f"Invalid '{param}' type, expected: '{type}', got: '{type(val)}'",
-            )
-        )
+                ip = config.ip
+
+                while ip[-1] == "/":
+                    ip = ip[:-1]
+
+                return f"http://{ip}/{endpoint}"
+
+    return None
+
+
+def validate_required(cl: socket.socket, parameters: dict, param: str) -> any:
+    val = parameters.get(param)
+
+    # if type(val) is not param_type:
+    #     return cl.sendall(
+    #         compose_response(
+    #             status_code=400,
+    #             response=f"Invalid '{param}' type, expected: '{param_type}', got: '{type(val)}'",
+    #         )
+    #     )
 
     return val
 
 
 def connect(cl: socket.socket, parameters: dict):
 
-    host_name = validate_required(cl, parameters, "host_name", str)
-    ip = validate_required(cl, parameters, "ip", str)
-    redirect_endpoint = parameters.get("redirect_endpoint", None)
+    host_name = parameters.get("host_name")
+
+    if host_name is None:
+        cl.sendall(
+            compose_response(status_code=400, response=f"Missing param 'host_name'")
+        )
+        return 
+        
+    ip = parameters.get("ip")
+    
+    if ip is None:
+        cl.sendall(
+            compose_response(status_code=400, response=f"Missing param 'host_name'")
+        )
+        return 
+    
+    redirect_endpoint = parameters.get("redirect_endpoint")
 
     is_new_connection = True
     requires_save = False
-
+    redirects = []
     for id, config in enumerate(endpoint_config):
         if host_name != config.host_name:
             continue
 
-        if config.ip != ip:
-            requires_save = True
+        is_new_connection = False
 
-        if config.redirect_endpoint != redirect_endpoint:
+        if config.ip != ip or config.redirect_endpoint != redirect_endpoint:
             requires_save = True
 
         config.ip = ip
         config.redirect_endpoint = redirect_endpoint
         config.last_connection_time = utime.localtime()
-
-        is_new_connection = False
-
-        for target in config.redirects_to:
-            parameters_copy = parameters.copy()
-
-            url = f"{target}?"
-            for val in parameters_copy:
-                url += f"{val}={parameters_copy[val]}"
-
-            try:
-                res = requests.get(url=url, timeout=3)
-                res.close()
-                gc.collect()
-            except Exception as err:
-                print(err)
-        break
+        redirects = config.redirects_to
 
     if is_new_connection:
         endpoint_config.append(
             Endpoint(
-                parameters["host_name"],
+                host_name,
                 utime.localtime(),
-                parameters.get("ip", "Unknown"),
+                ip,
                 redirect_endpoint,
             )
         )
@@ -202,6 +209,17 @@ def connect(cl: socket.socket, parameters: dict):
         safe_config()
 
     cl.sendall(compose_response())
+
+    for target in redirects:
+        url = get_redirect_url(target)
+        print(url)
+        if url is not None:
+            try:
+                # res = requests.get(url=url, timeout=3)
+                # res.close()
+                gc.collect()
+            except Exception as err:
+                print(err)
 
 
 def get_endpoint_config(cl: socket.socket, parameters: dict):
@@ -236,6 +254,8 @@ class Endpoint:
     def __init__(
         self, host_name, last_connection_time, ip, redirect_endpoint, redirects_to=[]
     ):
+        if host_name == None or ip == None:
+            raise ValueError("incorrect params")
         self.host_name = host_name
         self.ip = ip
         self.redirect_endpoint = redirect_endpoint
@@ -283,8 +303,12 @@ def safe_config():
 def load_config():
     global endpoint_config
     path = "endpoint_config.json"
+    file = load_json_file(path)
 
-    config = [Endpoint.from_dict(data) for data in load_json_file(path)]
+    if file is None:
+        file = []
+
+    config = [Endpoint.from_dict(data) for data in file]
 
     if config is not None:
         endpoint_config = config
